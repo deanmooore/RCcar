@@ -2,6 +2,7 @@ import time
 from robot import *
 import os
 
+#this uses robot.py which is baseed on hooking up the jetson -> motor driver directly
 def test():
     #set permissions for pins!
     os.system('sudo busybox devmem 0x700031fc 32 0x45')
