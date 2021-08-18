@@ -1,4 +1,5 @@
 #similar idea to jetbot robot.py, used for L298N motor driver directly.
+#no longer used, was used briefly for debugging.
 
 #adapted code from Anand Mohan
 #https://medium.com/@anandmohan_8991/jetbot-using-l298n-pwm-motor-a6556ed358d6
