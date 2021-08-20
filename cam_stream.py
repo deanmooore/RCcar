@@ -1,5 +1,7 @@
+#script that just runs the cameras for visual check
 import cv2
 import numpy as np
+import utilities
 
 def opencamstream():
     ncam = cv2.VideoCapture(1)  #narrow fov
@@ -21,10 +23,15 @@ def opencamstream():
         nrgb = cv2.cvtColor(nframe, cv2.COLOR_RGB2Lab)
         wrgb = cv2.cvtColor(wframe, cv2.COLOR_RGB2Lab)
         
-        #denoise with universal kernel application
+        #sharpen with universal kernel application
         #later on, try doing varied kernel
-        nframe = denoise(nframe,8)
-        wframe = denoise(wframe,8)
+        nframe = utilities.Process.sharpen(nframe,1)
+        #wframe = utilities.Process.sharpen(wframe,1)
+
+        #flip images
+        nframe=cv2.rotate(nframe,cv2.ROTATE_90_CLOCKWISE)
+        nframe=cv2.flip(nframe,1)
+        wframe=cv2.flip(wframe,0)
 
         # Display the resulting frame
         cv2.imshow('nframe',nframe)
@@ -35,13 +42,4 @@ def opencamstream():
     ncam.release()
     wcam.release()
     cv2.destroyAllWindows()
-
-def denoise(image,sz):
-    xy = np.arange(81).reshape(9,9)
-    #this kernel isn't good, replace with gaussian after check
-    for k in range(len(xy)):
-        xy[k]=.2*abs(xy[k]-sz/2)**2
-    bimage=cv2.filter2D(image,1,xy)
-    return bimage
-
 opencamstream()
