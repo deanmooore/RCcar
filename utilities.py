@@ -2,6 +2,7 @@ import cv2
 import time
 from adafruit_motorkit import MotorKit
 import numpy as np
+import matplotlib.pyplot as plt
 
 class Movement:
     def __init__(self):
@@ -76,7 +77,20 @@ class Movement:
         #throttle forward some amount
         #throttle back some amount
         #check how much target point center moves left/right
+        ##########think we don't need to necessarily center the car to know displacement of cams, just make sure that we know the center of each camera.############
         error=[]
+    def slowforward(car,cam,t):  #moves forward based on camera output, imports car and time intended
+        reference = Movement.checkpointvelocity(car,cam)    #reference for how much velocity we should expect
+        before = time.time()
+        frames=np.array([])
+        p = 0   #how much we're powering motor
+        while time.time() < (before+t):
+            frames=np.array([frames,cam.read()])
+            if Calibrate.velocity(car,frames) < reference*.5:   #need to calibrate this number
+                p=p+0.05
+                car.motor1.throttle=p
+            after=time.time()
+        return car
     def fillFOV(car):  #move until target fills fov
         error = 10 #calculate error based on opencv
         max=10  #max allowable error
@@ -101,11 +115,18 @@ class Movement:
             p2 = Calibrate.gettargetcenter()
             error = p2-p1
         return error
+    def testpointvelocity(car,vid):    # quick test fw/back movement to see how much points would move, vid is cv2.VideoCapture
+        frames = cv2.cvtColor(vid.read(),cv2.COLOR_RGB2GRAY)
+        while Movement.bkfor(car,0.2):  #get frames while car is moving
+            frames  = np.dstack(frames,vid.read())
+        while Movement.fwfor(car,0.2):
+            frames = np.dstack(frames, vid.read())
+        return Calibrate.velocity(frames)
+
     def steprightsmart():#keeps track of camera movement to decide how much to move second time
         return []
     def stepleftsmart():    #keeps track of camera movement to decide how much to move second time
         return []
-
 
 class Calibrate:    #calibrate stores object with calibration results
     def __init__(self):
@@ -118,10 +139,43 @@ class Calibrate:    #calibrate stores object with calibration results
         MTF=np.array([[],[],[]])    
     def gettargetcenter(): #finds center of target and returns point in [x,y]
         return [0,0]
+    def velocity(cam,frames): #use cv image, check scene for differences, frames is N number of frames,cam is camera checked
+        v = []  #stores differences between detected image points
+        for x in range(1,len(frames)):
+            f1=frames[x-1]
+            f2=frames[x]
+            orb = cv2.ORB_create()
+            # find the keypoints and descriptors with ORB
+            kp1, des1 = orb.detectAndCompute(f1,None)
+            kp2, des2 = orb.detectAndCompute(f2,None)
+            bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+            # Match descriptors.
+            matches = bf.match(des1,des2)
+            # Sort them in the order of their distance.
+            matches = sorted(matches, key = lambda x:x.distance)
+            # Get average distance between points in matched list.
+            v=np.dstack((v,np.array(matches)))    
+        vel = np.average(v)
+        return cam, vel
+    def getframes(cam,t):
+        ret, f = cam.read()
+        frames = np.array(cv2.cvtColor(f,cv2.COLOR_RGB2GRAY))
+        before = time.time()
+        while time.time() < (before+t):
+            #append list of frames with new frames
+            ret, f = cam.read()
+            f = cv2.cvtColor(f,cv2.COLOR_RGB2GRAY)
+            frames=np.dstack((frames,f))
+        return cam, frames  #returns both camera and frames
     def gettargetgap(): #finds how much of target is missing in [x,y]
         return [0,0]
     def activeMTF():    #actively aligns to MTF target, stores results in object
         return []
+    def getcam(num):    #which camera number we want (1-2), in future make smart about finding these
+        cam = cv2.VideoCapture(num)  #narrow fov
+        if not cam.isOpened():
+            print("Cannot open camera number " + str(num))
+        return cam
     def saveresults(path):  #saves calibration results to file for retrieval, returns path
         return[]
 
@@ -146,15 +200,12 @@ class Process:  #stores image processing tools
             image = cv2.filter2D(im,-1,kernel)
         return image
         #create kernel
-
     def generatefilters(num,min,max):
         filters = np.linspace(min,max,num)
         ln = np.array(np.zeros(num))   #array the size of the # filters we need
         for x in range(min,max):
             #sz = 
             ln[x] = np.ones((sz,sz),np.float32)*(1/(sz**2))    #kernel of ones
-
-
     def varysharpness(im,ln):    #ln is linearly distributed list of kernel sizes, full diagonal use max
         image = im
         lenx, leny = len(image[1,:]),len(image[1,:])
@@ -165,6 +216,12 @@ class Process:  #stores image processing tools
                 image += np.dot(image,filter)   #need to figure out how to do this in the right location
         return image
 
+def main():
+    c = Calibrate.getcam(1) #get camera
+    c, frames = Calibrate.getframes(c,1)    #get frames over 1 second
+    c, v = Calibrate.velocity(c,frames)#calculate velocy based on frames
+
+main()
 
 
 
